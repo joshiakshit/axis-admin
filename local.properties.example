@@ -1,0 +1,3 @@
+sdk.dir=/path/to/Android/Sdk
+AXIS_BACKEND_URL=https://your-worker.example/
+ICLOUD_API_TOKEN=
