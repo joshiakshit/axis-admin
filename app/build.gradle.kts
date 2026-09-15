@@ -32,7 +32,6 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "AXIS_BACKEND_URL", quotedProperty("AXIS_BACKEND_URL"))
-        buildConfigField("String", "ICLOUD_API_TOKEN", quotedProperty("ICLOUD_API_TOKEN"))
     }
 
     buildFeatures {
@@ -54,6 +53,7 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
@@ -69,6 +69,7 @@ dependencies {
     testImplementation(libs.junit.api)
     testRuntimeOnly(libs.junit.engine)
     testImplementation(libs.mockk)
+    testImplementation(libs.coroutines.test)
 }
 
 tasks.withType<Test> { useJUnitPlatform() }

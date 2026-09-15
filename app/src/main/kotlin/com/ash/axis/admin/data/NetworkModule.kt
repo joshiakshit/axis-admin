@@ -53,39 +53,9 @@ object NetworkModule {
             .build()
 
     @Provides
-    @Singleton
-    @Named("icloud")
-    fun provideIcloudRetrofit(
-        client: OkHttpClient,
-        json: Json,
-    ): Retrofit {
-        val authenticated =
-            client.newBuilder().addInterceptor { chain ->
-                val request =
-                    chain.request().newBuilder()
-                        .header("authorization", BuildConfig.ICLOUD_API_TOKEN)
-                        .header("accept", "application/json")
-                        .header("referer", "api.icloudems.com")
-                        .header("user-agent", "Axis Admin Android")
-                        .build()
-                chain.proceed(request)
-            }.build()
-        return Retrofit.Builder()
-            .baseUrl("https://api.icloudems.com/")
-            .client(authenticated)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-            .build()
-    }
-
-    @Provides
     fun provideAdminApi(
         @Named("admin") retrofit: Retrofit,
     ): AdminApi = retrofit.create(AdminApi::class.java)
-
-    @Provides
-    fun provideIcloudApi(
-        @Named("icloud") retrofit: Retrofit,
-    ): IcloudAuthApi = retrofit.create(IcloudAuthApi::class.java)
 
     private fun normalized(url: String): String = if (url.endsWith('/')) url else "$url/"
 }

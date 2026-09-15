@@ -9,7 +9,7 @@ import retrofit2.http.PUT
 class AdminApiContractTest {
     @Test
     fun `admin calls map to the worker routes`() {
-        assertEquals("v1/admin/session", post("createSession"))
+        assertEquals("v1/admin/device-session", post("createDeviceSession"))
         assertEquals("v1/admin/users", get("listUsers"))
         assertEquals("v1/admin/users/{admno}/allow", post("allow"))
         assertEquals("v1/admin/users/{admno}/kick", post("kick"))

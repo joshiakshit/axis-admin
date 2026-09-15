@@ -19,33 +19,42 @@ import java.util.Base64
 
 class AdminRepositoryTest {
     private val adminApi = mockk<AdminApi>()
-    private val authApi = mockk<IcloudAuthApi>()
     private val store = mockk<SessionStore>(relaxed = true)
-    private val repository = AdminRepository(adminApi, authApi, store)
+    private val repository = AdminRepository(adminApi, store)
 
     @Test
-    fun `login stores only an approved admin Axis session`() =
+    fun `personal device login stores an approved admin Axis session`() =
         runBlocking {
-            coEvery { authApi.validateOtp(any()) } returns loginResponse("access", "refresh")
-            coEvery { adminApi.createSession(any()) } returns
+            every { store.readDeviceCredential() } returns "device-token"
+            coEvery { adminApi.createDeviceSession("Bearer device-token") } returns
                 AxisSession("approved", "admin", "21000", "Admin", "axis-token")
 
-            repository.completeLogin("9999999999", "123456", "9999999999")
+            repository.openPersonalDeviceSession()
 
             verify { store.save("axis-token") }
         }
 
     @Test
-    fun `login rejects a non-admin response and clears storage`() {
-        coEvery { authApi.validateOtp(any()) } returns loginResponse("access", "refresh")
-        coEvery { adminApi.createSession(any()) } returns
+    fun `personal device login rejects a non-admin response and clears storage`() {
+        every { store.readDeviceCredential() } returns "device-token"
+        coEvery { adminApi.createDeviceSession(any()) } returns
             AxisSession("approved", "user", "21001", "User", "user-token")
 
         assertThrows(IllegalStateException::class.java) {
-            runBlocking { repository.completeLogin("9999999999", "123456", "9999999999") }
+            runBlocking { repository.openPersonalDeviceSession() }
         }
         verify { store.clear() }
         verify(exactly = 0) { store.save(any()) }
+    }
+
+    @Test
+    fun `personal device login requires a provisioned credential`() {
+        every { store.readDeviceCredential() } returns null
+
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { repository.openPersonalDeviceSession() }
+        }
+        coVerify(exactly = 0) { adminApi.createDeviceSession(any()) }
     }
 
     @Test
@@ -91,11 +100,6 @@ class AdminRepositoryTest {
         assertTrue(confirmationText(DangerousAction.RaiseMinimum(4, 5)).contains("below version code 5"))
         assertTrue(confirmationText(DangerousAction.SetKillSwitch(true)).contains("block all student app access"))
     }
-
-    private fun loginResponse(
-        access: String,
-        refresh: String,
-    ) = LoginResponse(LoginData(token = IcloudTokens(access, refresh)))
 
     private fun httpException(code: Int): HttpException =
         HttpException(Response.error<Unit>(code, "error".toResponseBody("text/plain".toMediaType())))

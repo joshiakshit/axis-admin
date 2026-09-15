@@ -1,7 +1,5 @@
 package com.ash.axis.admin.data
 
-import android.os.Build
-import com.ash.axis.admin.BuildConfig
 import retrofit2.HttpException
 import java.util.Base64
 import javax.inject.Inject
@@ -12,52 +10,16 @@ class AdminRepository
     @Inject
     constructor(
         private val adminApi: AdminApi,
-        private val authApi: IcloudAuthApi,
         private val store: SessionStore,
     ) {
-        suspend fun requestOtp(
-            contact: String,
-            method: LoginMethod,
-        ): String {
-            val response =
-                authApi.requestOtp(
-                    mapOf(
-                        "method" to method.apiValue,
-                        "contact" to contact,
-                        "lastmodifiedby" to contact,
-                        "deviceid" to deviceId(),
-                        "appversion" to BuildConfig.VERSION_NAME,
-                    ),
-                )
-            return response.data?.username ?: contact
-        }
+        fun isProvisioned(): Boolean = store.readDeviceCredential() != null
 
-        suspend fun completeLogin(
-            contact: String,
-            otp: String,
-            username: String,
-        ): AxisSession {
-            val response =
-                authApi.validateOtp(
-                    mapOf(
-                        "otp" to otp,
-                        "contact" to contact,
-                        "username" to username,
-                        "lastmodifiedby" to contact,
-                        "deviceid" to deviceId(),
-                        "appversion" to BuildConfig.VERSION_NAME,
-                    ),
-                )
-            val tokens = response.data?.token ?: error(response.data?.message ?: "Login did not return tokens")
+        fun provision(token: String) = store.saveDeviceCredential(token.trim())
+
+        suspend fun openPersonalDeviceSession(): AxisSession {
+            val credential = store.readDeviceCredential() ?: error("This installation is not provisioned")
             val session =
-                adminApi.createSession(
-                    AdminSessionRequest(
-                        accessToken = tokens.accessToken,
-                        refreshToken = tokens.refreshToken,
-                        deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
-                        androidSdk = Build.VERSION.SDK_INT,
-                    ),
-                )
+                adminApi.createDeviceSession("Bearer $credential")
             val axisToken = session.sessionToken
             if (session.status != "approved" || session.role != "admin" || axisToken.isNullOrBlank()) {
                 store.clear()
@@ -82,6 +44,10 @@ class AdminRepository
         suspend fun users(): List<AdminUser> = authorized { adminApi.listUsers(it).users }
 
         suspend fun health(): HealthResponse = authorized { adminApi.health(it) }
+
+        suspend fun stats(): StatsResponse = authorized { adminApi.stats(it) }
+
+        suspend fun auditLog(): List<AuditEntry> = authorized { adminApi.auditLog(it).entries }
 
         suspend fun config(): RemoteConfig = authorized { adminApi.getConfig(it) }
 
@@ -116,6 +82,4 @@ class AdminRepository
                 val payload = String(Base64.getUrlDecoder().decode(token.split(".")[1]))
                 Regex("\"exp\"\\s*:\\s*(\\d+)").find(payload)?.groupValues?.get(1)?.toLong() ?: 0
             }.getOrDefault(0)
-
-        private fun deviceId(): String = "axis-admin-${Build.MODEL}"
     }

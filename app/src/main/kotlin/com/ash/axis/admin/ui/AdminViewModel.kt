@@ -4,10 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ash.axis.admin.data.AdminRepository
 import com.ash.axis.admin.data.AdminUser
+import com.ash.axis.admin.data.AuditEntry
 import com.ash.axis.admin.data.ConfigPatch
 import com.ash.axis.admin.data.HealthResponse
-import com.ash.axis.admin.data.LoginMethod
 import com.ash.axis.admin.data.RemoteConfig
+import com.ash.axis.admin.data.StatsResponse
 import com.ash.axis.admin.data.UserAction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,17 +18,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class AdminPage { DASHBOARD, USERS, CONFIG }
+enum class AdminPage { DASHBOARD, USERS, CONFIG, AUDIT }
 
 data class AdminUiState(
+    val provisioned: Boolean = false,
     val signedIn: Boolean = false,
-    val otpRequested: Boolean = false,
-    val username: String = "",
     val page: AdminPage = AdminPage.DASHBOARD,
     val loading: Boolean = false,
     val health: HealthResponse? = null,
+    val stats: StatsResponse? = null,
     val users: List<AdminUser> = emptyList(),
     val config: RemoteConfig? = null,
+    val auditLog: List<AuditEntry> = emptyList(),
     val error: String? = null,
     val message: String? = null,
 )
@@ -38,47 +40,51 @@ class AdminViewModel
     constructor(
         private val repository: AdminRepository,
     ) : ViewModel() {
-        private val mutableState = MutableStateFlow(AdminUiState(signedIn = repository.hasSession()))
+        private val mutableState = MutableStateFlow(AdminUiState(provisioned = repository.isProvisioned()))
         val state: StateFlow<AdminUiState> = mutableState.asStateFlow()
 
         init {
-            if (mutableState.value.signedIn) loadDashboard()
+            if (mutableState.value.provisioned) connect()
         }
 
-        fun requestOtp(
-            contact: String,
-            method: LoginMethod,
-        ) = runOperation {
-            val username = repository.requestOtp(contact.trim(), method)
-            mutableState.update { it.copy(otpRequested = true, username = username, message = "OTP sent") }
+        fun provision(token: String) {
+            repository.provision(token)
+            mutableState.update { it.copy(provisioned = true, error = null) }
+            connect()
         }
 
-        fun completeLogin(
-            contact: String,
-            otp: String,
-        ) = runOperation {
-            repository.completeLogin(contact.trim(), otp.trim(), mutableState.value.username)
-            mutableState.update { it.copy(signedIn = true, otpRequested = false, page = AdminPage.DASHBOARD) }
-            loadDashboard()
-        }
-
-        fun logout() {
-            repository.logout()
-            mutableState.value = AdminUiState()
-        }
+        fun connect() =
+            runOperation {
+                if (!repository.hasSession()) repository.openPersonalDeviceSession()
+                mutableState.update {
+                    it.copy(
+                        provisioned = true,
+                        signedIn = true,
+                        page = AdminPage.DASHBOARD,
+                        health = repository.health(),
+                    )
+                }
+            }
 
         fun select(page: AdminPage) {
             mutableState.update { it.copy(page = page, error = null, message = null) }
+            refresh(page)
+        }
+
+        fun refresh(page: AdminPage = mutableState.value.page) {
             when (page) {
                 AdminPage.DASHBOARD -> loadDashboard()
                 AdminPage.USERS -> loadUsers()
                 AdminPage.CONFIG -> loadConfig()
+                AdminPage.AUDIT -> loadAuditLog()
             }
         }
 
         fun loadDashboard() =
             runOperation {
-                mutableState.update { it.copy(health = repository.health()) }
+                val health = repository.health()
+                val stats = repository.stats()
+                mutableState.update { it.copy(health = health, stats = stats) }
             }
 
         fun loadUsers() =
@@ -89,6 +95,11 @@ class AdminViewModel
         fun loadConfig() =
             runOperation {
                 mutableState.update { it.copy(config = repository.config()) }
+            }
+
+        fun loadAuditLog() =
+            runOperation {
+                mutableState.update { it.copy(auditLog = repository.auditLog()) }
             }
 
         fun setUserStatus(

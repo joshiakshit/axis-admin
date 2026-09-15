@@ -13,6 +13,10 @@ interface SessionStore {
     fun save(token: String)
 
     fun clear()
+
+    fun readDeviceCredential(): String?
+
+    fun saveDeviceCredential(token: String)
 }
 
 @Singleton
@@ -40,7 +44,14 @@ class EncryptedSessionStore
             preferences.edit().remove(KEY).apply()
         }
 
+        override fun readDeviceCredential(): String? = preferences.getString(DEVICE_CREDENTIAL, null)
+
+        override fun saveDeviceCredential(token: String) {
+            preferences.edit().putString(DEVICE_CREDENTIAL, token).apply()
+        }
+
         private companion object {
             const val KEY = "axis_session_token"
+            const val DEVICE_CREDENTIAL = "admin_device_credential"
         }
     }

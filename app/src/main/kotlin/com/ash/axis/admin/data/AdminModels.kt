@@ -4,16 +4,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class AdminSessionRequest(
-    val accessToken: String,
-    val refreshToken: String,
-    val appVersionName: String = "1.0.0",
-    val appVersionCode: Int = 1,
-    val deviceModel: String = "",
-    val androidSdk: Int = 0,
-)
-
-@Serializable
 data class AxisSession(
     val status: String = "",
     val role: String = "",
@@ -85,25 +75,37 @@ data class ConfigPatch(
 data class ApproveAllResponse(val approved: Int = 0)
 
 @Serializable
-data class IcloudTokens(
-    @SerialName("access_token") val accessToken: String,
-    @SerialName("refresh_token") val refreshToken: String,
+data class VersionBucket(val version: String = "", val count: Int = 0)
+
+@Serializable
+data class DeviceBucket(val device: String = "", val count: Int = 0)
+
+@Serializable
+data class SdkBucket(val sdk: Int = 0, val count: Int = 0)
+
+@Serializable
+data class StatsResponse(
+    val totalUsers: Int = 0,
+    val activeLastDay: Int = 0,
+    val activeLastWeek: Int = 0,
+    val activeLastMonth: Int = 0,
+    val versionDistribution: List<VersionBucket> = emptyList(),
+    val deviceDistribution: List<DeviceBucket> = emptyList(),
+    val sdkDistribution: List<SdkBucket> = emptyList(),
 )
 
 @Serializable
-data class LoginData(
-    val token: IcloudTokens? = null,
-    val username: String? = null,
-    val message: String? = null,
+data class AuditEntry(
+    val id: Int = 0,
+    @SerialName("actor_admno") val actorAdmno: String = "",
+    val action: String = "",
+    @SerialName("target_admno") val targetAdmno: String = "",
+    val detail: String = "",
+    @SerialName("created_at") val createdAt: String = "",
 )
 
 @Serializable
-data class LoginResponse(val data: LoginData? = null)
-
-enum class LoginMethod(val apiValue: String) {
-    PHONE("phone"),
-    EMAIL("email"),
-}
+data class AuditLogResponse(val entries: List<AuditEntry> = emptyList())
 
 enum class UserAction { ALLOW, KICK, BAN }
 

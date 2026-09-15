@@ -7,10 +7,11 @@ import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
 
+@Suppress("TooManyFunctions")
 interface AdminApi {
-    @POST("v1/admin/session")
-    suspend fun createSession(
-        @Body body: AdminSessionRequest,
+    @POST("v1/admin/device-session")
+    suspend fun createDeviceSession(
+        @Header("Authorization") authorization: String,
     ): AxisSession
 
     @GET("v1/admin/users")
@@ -56,16 +57,14 @@ interface AdminApi {
         @Header("Authorization") authorization: String,
         @Body patch: ConfigPatch,
     ): RemoteConfig
-}
 
-interface IcloudAuthApi {
-    @POST("users/login")
-    suspend fun requestOtp(
-        @Body body: Map<String, String>,
-    ): LoginResponse
+    @GET("v1/admin/stats")
+    suspend fun stats(
+        @Header("Authorization") authorization: String,
+    ): StatsResponse
 
-    @POST("users/login/validate")
-    suspend fun validateOtp(
-        @Body body: Map<String, String>,
-    ): LoginResponse
+    @GET("v1/admin/audit-log")
+    suspend fun auditLog(
+        @Header("Authorization") authorization: String,
+    ): AuditLogResponse
 }

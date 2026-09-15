@@ -11,3 +11,4 @@ app/build/
 *.keystore
 .claude/
 CLAUDE.md
+.admin-app-token
