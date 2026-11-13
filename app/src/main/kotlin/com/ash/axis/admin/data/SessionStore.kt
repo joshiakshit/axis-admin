@@ -17,6 +17,8 @@ interface SessionStore {
     fun readDeviceCredential(): String?
 
     fun saveDeviceCredential(token: String)
+
+    fun forgetDevice()
 }
 
 @Singleton
@@ -48,6 +50,10 @@ class EncryptedSessionStore
 
         override fun saveDeviceCredential(token: String) {
             preferences.edit().putString(DEVICE_CREDENTIAL, token).apply()
+        }
+
+        override fun forgetDevice() {
+            preferences.edit().clear().commit()
         }
 
         private companion object {

@@ -18,6 +18,8 @@ class AdminApiContractTest {
         assertEquals("v1/admin/health", get("health"))
         assertEquals("v1/admin/config", get("getConfig"))
         assertEquals("v1/admin/config", put("putConfig"))
+        assertEquals("v1/admin/stats", get("stats"))
+        assertEquals("v1/admin/audit-log", get("auditLog"))
     }
 
     private fun method(name: String) = AdminApi::class.java.methods.single { it.name == name }

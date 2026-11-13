@@ -6,6 +6,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 @Suppress("TooManyFunctions")
 interface AdminApi {
@@ -66,5 +67,6 @@ interface AdminApi {
     @GET("v1/admin/audit-log")
     suspend fun auditLog(
         @Header("Authorization") authorization: String,
+        @Query("before") before: Int? = null,
     ): AuditLogResponse
 }

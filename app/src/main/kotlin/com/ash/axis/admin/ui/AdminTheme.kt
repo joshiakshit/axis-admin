@@ -1,10 +1,8 @@
 package com.ash.axis.admin.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -12,11 +10,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-private val Primary = Color(0xFF6E90C0)
-private val OnPrimary = Color.White
-private val PrimaryContainer = Color(0xFF16202C)
-private val OnPrimaryContainer = Color(0xFFB4C6DA)
-private val Secondary = Color(0xFF8FA9CC)
+private val Primary = Color(0xFFF4F4F5)
+private val OnPrimary = Color.Black
+private val PrimaryContainer = Color(0xFF19191B)
+private val OnPrimaryContainer = Color(0xFFE4E4E7)
+private val Secondary = Color(0xFFC6C6CC)
 
 private val DarkBg = Color(0xFF000000)
 private val DarkOnBg = Color(0xFFF2F2F4)
@@ -52,28 +50,6 @@ private val DarkScheme =
         onError = Color.White,
     )
 
-private val LightScheme =
-    lightColorScheme(
-        primary = Primary,
-        onPrimary = OnPrimary,
-        primaryContainer = Color(0xFFE0E8F2),
-        onPrimaryContainer = Primary,
-        secondary = Secondary,
-        onSecondary = OnPrimary,
-        background = Color(0xFFF7F9FC),
-        onBackground = Color(0xFF1A1C1E),
-        surface = Color(0xFFF7F9FC),
-        onSurface = Color(0xFF1A1C1E),
-        surfaceVariant = Color(0xFFEBEFF5),
-        onSurfaceVariant = Color(0xFF44474F),
-        outline = Color(0xFF74777F),
-        outlineVariant = Color(0xFFE0E4EA),
-        secondaryContainer = Color(0xFFE0E8F2),
-        onSecondaryContainer = Primary,
-        error = Color(0xFFD32F2F),
-        onError = Color.White,
-    )
-
 private val AdminTypography =
     Typography(
         headlineLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 32.sp),
@@ -103,7 +79,5 @@ private val AdminTypography =
 
 @Composable
 fun AdminTheme(content: @Composable () -> Unit) {
-    val isDark = isSystemInDarkTheme()
-    val colorScheme = if (isDark) DarkScheme else LightScheme
-    MaterialTheme(colorScheme = colorScheme, typography = AdminTypography, content = content)
+    MaterialTheme(colorScheme = DarkScheme, typography = AdminTypography, content = content)
 }

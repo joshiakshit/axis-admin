@@ -51,6 +51,29 @@ The debug provisioning activity requires Android's privileged `DUMP` permission,
 which the ADB shell holds. It disables itself after saving the credential in
 encrypted app storage. The credential is not compiled into the APK or committed.
 
+## Signed release APK
+
+Use the release installer for a phone. Debug APKs are development builds.
+
+```bash
+JAVA_HOME=/path/to/jdk17 scripts/build-release.sh
+```
+
+The script builds the release variant, checks APK alignment, signs it, and verifies
+the signature. The output is `app/build/outputs/apk/release/axis-admin-release.apk`.
+It requires Android build-tools 36.0.0 (override with `AXIS_BUILD_TOOLS_VERSION`).
+
+This workstation's dedicated release key is stored outside Git in
+`~/.local/share/axis-admin/signing/axis-admin-release.p12`, with its password in
+`~/.local/share/axis-admin/signing/release.password`. The alias is `axis-admin`.
+Back up both protected files; future release updates must use the same key.
+Override the locations with `AXIS_RELEASE_KEYSTORE` and
+`AXIS_RELEASE_PASSWORD_FILE`, and the alias with `AXIS_RELEASE_KEY_ALIAS`.
+
+The release signing key differs from the Android debug key. A debug installation
+must be removed before installing this release; enter the app token again after
+installation. Release APKs exclude the ADB-only debug provisioning activity.
+
 ## Checks
 
 ```bash

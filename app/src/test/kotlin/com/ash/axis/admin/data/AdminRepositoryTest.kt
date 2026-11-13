@@ -5,7 +5,10 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -35,7 +38,7 @@ class AdminRepositoryTest {
         }
 
     @Test
-    fun `personal device login rejects a non-admin response and clears storage`() {
+    fun `personal device login rejects a non-admin response`() {
         every { store.readDeviceCredential() } returns "device-token"
         coEvery { adminApi.createDeviceSession(any()) } returns
             AxisSession("approved", "user", "21001", "User", "user-token")
@@ -43,7 +46,6 @@ class AdminRepositoryTest {
         assertThrows(IllegalStateException::class.java) {
             runBlocking { repository.openPersonalDeviceSession() }
         }
-        verify { store.clear() }
         verify(exactly = 0) { store.save(any()) }
     }
 
@@ -67,13 +69,83 @@ class AdminRepositoryTest {
     }
 
     @Test
-    fun `authorization failure clears the Axis session`() {
+    fun `permission denial does not destroy a valid session`() {
         every { store.read() } returns jwt(mapOf("exp" to 9_999_999_999))
         coEvery { adminApi.listUsers(any()) } throws httpException(403)
 
         assertThrows(HttpException::class.java) { runBlocking { repository.users() } }
-        verify { store.clear() }
+        verify(exactly = 0) { store.clear() }
+        coVerify(exactly = 0) { adminApi.createDeviceSession(any()) }
     }
+
+    @Test
+    fun `invalid provisioning does not replace a working credential`() =
+        runBlocking {
+            coEvery { adminApi.createDeviceSession(any()) } throws httpException(401)
+            assertThrows(HttpException::class.java) { runBlocking { repository.provision("bad") } }
+            verify(exactly = 0) { store.saveDeviceCredential(any()) }
+            verify(exactly = 0) { store.save(any()) }
+        }
+
+    @Test
+    fun `an expired session renews before requesting users`() =
+        runBlocking {
+            val expired = jwt(mapOf("exp" to 1))
+            val renewed = jwt(mapOf("exp" to 9_999_999_999))
+            every { store.read() } returns expired andThen renewed
+            every { store.readDeviceCredential() } returns "device-token"
+            coEvery { adminApi.createDeviceSession(any()) } returns AxisSession("approved", "admin", sessionToken = renewed)
+            coEvery { adminApi.listUsers("Bearer $renewed") } returns UsersResponse()
+
+            repository.users()
+
+            coVerify(exactly = 1) { adminApi.createDeviceSession("Bearer device-token") }
+            coVerify(exactly = 1) { adminApi.listUsers("Bearer $renewed") }
+            coVerify(exactly = 0) { adminApi.listUsers("Bearer $expired") }
+        }
+
+    @Test
+    fun `an unauthorized request retries only once with a renewed session`() =
+        runBlocking {
+            val original = jwt(mapOf("exp" to 9_999_999_999))
+            val renewed = jwt(mapOf("exp" to 9_999_999_998))
+            var saved = original
+            every { store.read() } answers { saved }
+            every { store.save(any()) } answers { saved = firstArg() }
+            every { store.readDeviceCredential() } returns "device-token"
+            coEvery { adminApi.createDeviceSession(any()) } returns AxisSession("approved", "admin", sessionToken = renewed)
+            coEvery { adminApi.listUsers(any()) } throws httpException(401)
+
+            assertThrows(HttpException::class.java) { runBlocking { repository.users() } }
+
+            coVerify(exactly = 1) { adminApi.createDeviceSession(any()) }
+            coVerify(exactly = 2) { adminApi.listUsers(any()) }
+        }
+
+    @Test
+    fun `concurrent expired requests share a single session renewal`() =
+        runBlocking {
+            val renewed = jwt(mapOf("exp" to 9_999_999_999))
+            var saved: String? = jwt(mapOf("exp" to 1))
+            val gate = CompletableDeferred<Unit>()
+            every { store.read() } answers { saved }
+            every { store.clear() } answers { saved = null }
+            every { store.save(any()) } answers { saved = firstArg() }
+            every { store.readDeviceCredential() } returns "device-token"
+            coEvery { adminApi.createDeviceSession(any()) } coAnswers {
+                gate.await()
+                AxisSession("approved", "admin", sessionToken = renewed)
+            }
+            coEvery { adminApi.listUsers("Bearer $renewed") } returns UsersResponse()
+            val first = async { repository.users() }
+            val second = async { repository.users() }
+            yield()
+            gate.complete(Unit)
+            first.await()
+            second.await()
+            coVerify(exactly = 1) { adminApi.createDeviceSession(any()) }
+            coVerify(exactly = 2) { adminApi.listUsers("Bearer $renewed") }
+        }
 
     @Test
     fun `user actions call their exact endpoints`() =

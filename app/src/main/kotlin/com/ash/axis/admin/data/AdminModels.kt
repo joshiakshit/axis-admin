@@ -60,6 +60,7 @@ data class RemoteConfig(
 
 @Serializable
 data class ConfigPatch(
+    val expectedUpdatedAt: String? = null,
     val appVersion: String? = null,
     val minSupportedVersionCode: Int? = null,
     val latestVersionCode: Int? = null,
@@ -105,7 +106,7 @@ data class AuditEntry(
 )
 
 @Serializable
-data class AuditLogResponse(val entries: List<AuditEntry> = emptyList())
+data class AuditLogResponse(val entries: List<AuditEntry> = emptyList(), val nextCursor: Int? = null)
 
 enum class UserAction { ALLOW, KICK, BAN }
 

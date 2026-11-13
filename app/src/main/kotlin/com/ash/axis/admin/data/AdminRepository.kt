@@ -1,5 +1,7 @@
 package com.ash.axis.admin.data
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.util.Base64
 import javax.inject.Inject
@@ -12,20 +14,32 @@ class AdminRepository
         private val adminApi: AdminApi,
         private val store: SessionStore,
     ) {
+        private val sessionMutex = Mutex()
+
         fun isProvisioned(): Boolean = store.readDeviceCredential() != null
 
-        fun provision(token: String) = store.saveDeviceCredential(token.trim())
+        suspend fun provision(token: String) =
+            sessionMutex.withLock {
+                val credential = token.trim()
+                require(credential.isNotBlank()) { "Enter the app token" }
+                val session = createSession(credential)
+                store.saveDeviceCredential(credential)
+                store.save(requireNotNull(session.sessionToken))
+            }
 
         suspend fun openPersonalDeviceSession(): AxisSession {
             val credential = store.readDeviceCredential() ?: error("This installation is not provisioned")
-            val session =
-                adminApi.createDeviceSession("Bearer $credential")
+            val session = createSession(credential)
+            store.save(requireNotNull(session.sessionToken))
+            return session
+        }
+
+        private suspend fun createSession(credential: String): AxisSession {
+            val session = adminApi.createDeviceSession("Bearer $credential")
             val axisToken = session.sessionToken
             if (session.status != "approved" || session.role != "admin" || axisToken.isNullOrBlank()) {
-                store.clear()
                 error("This identity is not an approved Axis administrator")
             }
-            store.save(axisToken)
             return session
         }
 
@@ -39,7 +53,7 @@ class AdminRepository
             return true
         }
 
-        fun logout() = store.clear()
+        fun forgetDevice() = store.forgetDevice()
 
         suspend fun users(): List<AdminUser> = authorized { adminApi.listUsers(it).users }
 
@@ -47,7 +61,7 @@ class AdminRepository
 
         suspend fun stats(): StatsResponse = authorized { adminApi.stats(it) }
 
-        suspend fun auditLog(): List<AuditEntry> = authorized { adminApi.auditLog(it).entries }
+        suspend fun auditLog(before: Int? = null): AuditLogResponse = authorized { adminApi.auditLog(it, before) }
 
         suspend fun config(): RemoteConfig = authorized { adminApi.getConfig(it) }
 
@@ -68,12 +82,29 @@ class AdminRepository
             }
 
         private suspend fun <T> authorized(block: suspend (String) -> T): T {
-            val token = store.read() ?: error("Admin session required")
+            val token =
+                sessionMutex.withLock {
+                    if (!hasSession()) openPersonalDeviceSession()
+                    store.read() ?: error("Admin session required")
+                }
             return try {
                 block("Bearer $token")
             } catch (error: HttpException) {
-                if (error.code() == 401 || error.code() == 403) store.clear()
-                throw error
+                if (error.code() != 401) throw error
+                val renewed =
+                    sessionMutex.withLock {
+                        if (store.read() == token || !hasSession()) {
+                            store.clear()
+                            openPersonalDeviceSession()
+                        }
+                        store.read() ?: error("Admin session required")
+                    }
+                try {
+                    block("Bearer $renewed")
+                } catch (retryError: HttpException) {
+                    if (retryError.code() == 401) store.clear()
+                    throw retryError
+                }
             }
         }
 
